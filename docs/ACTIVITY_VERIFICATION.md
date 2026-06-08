@@ -4,6 +4,10 @@
 
 - Done: Search screen has a text input and search button.
 - Done: User input is validated so the search field is not empty.
+- Done: Multi-word searches, numeric searches, and symbol searches show specific validation messages.
+- Done: Hyphenated words such as `ice-cream` are treated as valid single-word searches.
+- Done: Apostrophe words such as `o'clock` are treated as valid single-word searches.
+- Done: Unknown or non-English words are sent to the API and handled with the word-not-found message.
 - Done: The entered word is captured when the user submits the search field.
 - Done: The API request URL is constructed dynamically using the entered word.
 - Done: axios sends an HTTP GET request to `https://api.dictionaryapi.dev/api/v2/entries/en/{word}`.
@@ -29,6 +33,7 @@
 - Done: The audio file is loaded from the provided URL using `expo-av`.
 - Done: Audio plays when the user taps the pronunciation icon.
 - Done: Multiple audio pronunciations are handled with separate speaker buttons.
+- Done: Pronunciations are labeled by region when the API audio URL identifies UK, US, or Australian audio.
 - Done: The audio button is disabled or hidden if no pronunciation is provided.
 - Done: Audio playback states are managed: play, pause, and stop.
 - Done: Audio playback errors are handled gracefully with a friendly message.
@@ -43,6 +48,12 @@
 - Done: Tapping a history item triggers a new API request.
 - Done: The word detail screen refreshes with the selected word data.
 - Done: Duplicate entries are prevented.
+- Done: Search history is persisted with AsyncStorage so it remains available after reload.
+
+## Additional UI Requirement
+
+- Done: Light mode and dark mode are available from the header theme button.
+- Done: The selected theme is persisted after reload.
 
 ## Activity 5: Error Handling & User Feedback
 

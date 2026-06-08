@@ -80,17 +80,24 @@ npm run doctor
 ## Manual Test Steps
 
 1. Open the app and search with an empty input. The app should show a validation message.
-2. Search `example`. The app should show the word, phonetic spelling, parts of speech, definitions, examples, and pronunciation controls when audio exists.
-3. Tap a speaker icon. The audio should load and play.
-4. Tap pause while audio is playing. Playback should pause.
-5. Tap play again. Playback should resume.
-6. Tap stop. Playback should stop and reset.
-7. Search a word with multiple pronunciation URLs. The app should show multiple speaker buttons.
-8. Search a word without audio. The pronunciation buttons should be hidden.
-9. Search `zzzznotaword`. The app should show a friendly word-not-found message.
-10. Turn off the network and search a word. The app should show a network error and should not crash.
-11. Search the same valid word twice. The drawer history should show it only once.
-12. Open the drawer and tap a searched word. The app should fetch that word again and refresh the details screen.
+2. Search `hello world`. The app should show `Please search for one word, not a sentence.`
+3. Search `hello123` or `42`. The app should show `Please search for a word instead of numbers.`
+4. Search `@hello` or `test!`. The app should show `Please search for a word instead of characters`
+5. Search `ice-cream` or `o'clock`. The app should allow valid English word punctuation and search normally.
+6. Search a non-English or unknown word. The app should let the API decide and show a friendly word-not-found message when the word does not exist.
+7. Search `example`. The app should show the word, phonetic spelling, parts of speech, definitions, examples, and labeled pronunciation controls when audio exists.
+8. Tap a speaker icon. The audio should load and play.
+9. Tap pause while audio is playing. Playback should pause.
+10. Tap play again. Playback should resume.
+11. Tap stop. Playback should stop and reset.
+12. Search a word with multiple pronunciation URLs. The app should show labeled pronunciation cards such as UK Pronunciation, US Pronunciation, or Australian Pronunciation when the API URL identifies the region.
+13. Search a word without audio. The pronunciation section should be hidden.
+14. Toggle dark mode and light mode. The app should switch theme colors and remember the selected theme after reload.
+15. Search `zzzznotaword`. The app should show a friendly word-not-found message.
+16. Turn off the network and search a word. The app should show a network error and should not crash.
+17. Search the same valid word twice. The drawer history should show it only once.
+18. Reload the app. The drawer history should still be available.
+19. Open the drawer and tap a searched word. The app should fetch that word again and refresh the details screen.
 
 ## Troubleshooting
 

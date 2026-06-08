@@ -15,12 +15,15 @@ import {
   View
 } from "react-native";
 import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
 import { StatusBar } from "expo-status-bar";
 import { MaterialIcons } from "@expo/vector-icons";
 
 const API_BASE_URL = "https://api.dictionaryapi.dev/api/v2/entries/en";
 const DRAWER_WIDTH = Math.min(330, Dimensions.get("window").width * 0.84);
+const HISTORY_STORAGE_KEY = "lexitech.dictionary.history";
+const THEME_STORAGE_KEY = "lexitech.dictionary.theme";
 const SAMPLE_WORDS = [
   ["latest", "#FFD6D6"],
   ["endeavor", "#D9E6FF"],
@@ -60,6 +63,55 @@ function normalizeHistoryItem(word) {
   return word.trim().toLowerCase();
 }
 
+function validateSearchTerm(value) {
+  const cleanedValue = value.trim();
+
+  if (!cleanedValue) {
+    return "Please enter a word to search.";
+  }
+
+  if (/\s+/.test(cleanedValue)) {
+    return "Please search for one word, not a sentence.";
+  }
+
+  if (/\d/.test(cleanedValue)) {
+    return "Please search for a word instead of numbers.";
+  }
+
+  if (!/^[a-zA-Z]+(?:[-'’][a-zA-Z]+)*$/.test(cleanedValue)) {
+    return "Please search for a word instead of characters";
+  }
+
+  if (cleanedValue.length > 60) {
+    return "Please search for a shorter word.";
+  }
+
+  return "";
+}
+
+function getPronunciationLabel(audioUrl, index) {
+  const url = audioUrl.toLowerCase();
+
+  if (url.includes("-uk") || url.includes("_uk") || url.includes("uk.mp3")) {
+    return "UK Pronunciation";
+  }
+
+  if (url.includes("-us") || url.includes("_us") || url.includes("us.mp3")) {
+    return "US Pronunciation";
+  }
+
+  if (
+    url.includes("-au") ||
+    url.includes("_au") ||
+    url.includes("au.mp3") ||
+    url.includes("australia")
+  ) {
+    return "Australian Pronunciation";
+  }
+
+  return `Pronunciation ${index + 1}`;
+}
+
 function extractAudioOptions(entries) {
   const seen = new Set();
 
@@ -68,7 +120,8 @@ function extractAudioOptions(entries) {
     .filter((phonetic) => phonetic.audio)
     .map((phonetic, index) => ({
       id: `${phonetic.audio}-${index}`,
-      label: phonetic.text || `Audio ${index + 1}`,
+      label: getPronunciationLabel(phonetic.audio, index),
+      phonetic: phonetic.text || "",
       url: phonetic.audio
     }))
     .filter((item) => {
@@ -80,7 +133,7 @@ function extractAudioOptions(entries) {
     });
 }
 
-function HighlightStory() {
+function HighlightStory({ styles }) {
   return (
     <View style={styles.storyPanel}>
       <Text style={styles.storyTitle}>Tap your words for definitions</Text>
@@ -98,7 +151,7 @@ function HighlightStory() {
   );
 }
 
-function ResultView({ audioPlayback, data, onPauseAudio, onStopAudio, onToggleAudio }) {
+function ResultView({ audioPlayback, data, onPauseAudio, onStopAudio, onToggleAudio, styles }) {
   const entry = data?.[0];
 
   if (!entry) {
@@ -120,66 +173,76 @@ function ResultView({ audioPlayback, data, onPauseAudio, onStopAudio, onToggleAu
           <Text style={styles.phonetic}>{phoneticText}</Text>
         </View>
 
-        {audioOptions.length > 0 ? (
-          <View style={styles.audioStack}>
-            {audioOptions.map((audio) => (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Play pronunciation ${audio.label}`}
+      </View>
+
+      {audioOptions.length > 0 ? (
+        <View style={styles.pronunciationSection}>
+          <View style={styles.pronunciationTitleRow}>
+            <MaterialIcons color="#7B5CE6" name="mic" size={18} />
+            <Text style={styles.pronunciationTitle}>Pronunciations</Text>
+          </View>
+          {audioOptions.map((audio) => {
+            const isActive = audioPlayback.url === audio.url;
+            const isPlaying = isActive && audioPlayback.status === "playing";
+
+            return (
+              <View
                 key={audio.id}
-                onPress={() => onToggleAudio(audio.url)}
-                style={({ pressed }) => [
-                  styles.audioButton,
-                  audioPlayback.url === audio.url && styles.audioButtonActive,
-                  pressed && styles.pressed
-                ]}
+                style={[styles.pronunciationCard, isActive && styles.pronunciationCardActive]}
               >
-                <MaterialIcons
-                  color={audioPlayback.url === audio.url ? "#FFFFFF" : "#29524A"}
-                  name={
-                    audioPlayback.url === audio.url && audioPlayback.status === "playing"
-                      ? "graphic-eq"
-                      : "volume-up"
-                  }
-                  size={22}
-                />
-              </Pressable>
-            ))}
-            {audioPlayback.url ? (
-              <View style={styles.audioControls}>
                 <Pressable
-                  accessibilityLabel={
-                    audioPlayback.status === "playing"
-                      ? "Pause pronunciation audio"
-                      : "Resume pronunciation audio"
-                  }
-                  disabled={audioPlayback.status === "loading"}
-                  onPress={
-                    audioPlayback.status === "playing"
-                      ? onPauseAudio
-                      : () => onToggleAudio(audioPlayback.url)
-                  }
-                  style={({ pressed }) => [styles.audioControlButton, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Play ${audio.label}`}
+                  onPress={() => onToggleAudio(audio.url)}
+                  style={({ pressed }) => [
+                    styles.pronunciationIcon,
+                    isActive && styles.pronunciationIconActive,
+                    pressed && styles.pressed
+                  ]}
                 >
                   <MaterialIcons
-                    color="#29524A"
-                    name={audioPlayback.status === "playing" ? "pause" : "play-arrow"}
-                    size={18}
+                    color={isActive ? "#FFFFFF" : "#5546BA"}
+                    name={isPlaying ? "graphic-eq" : "volume-up"}
+                    size={22}
                   />
                 </Pressable>
                 <Pressable
-                  accessibilityLabel="Stop pronunciation audio"
-                  disabled={audioPlayback.status === "loading"}
-                  onPress={onStopAudio}
-                  style={({ pressed }) => [styles.audioControlButton, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  onPress={() => onToggleAudio(audio.url)}
+                  style={styles.pronunciationTextWrap}
                 >
-                  <MaterialIcons color="#29524A" name="stop" size={18} />
+                  <Text style={styles.pronunciationLabel}>{audio.label}</Text>
+                  <Text style={styles.pronunciationPhonetic}>{audio.phonetic || phoneticText}</Text>
                 </Pressable>
+                {isActive ? (
+                  <View style={styles.pronunciationControls}>
+                    <Pressable
+                      accessibilityLabel={isPlaying ? "Pause pronunciation audio" : "Resume pronunciation audio"}
+                      disabled={audioPlayback.status === "loading"}
+                      onPress={isPlaying ? onPauseAudio : () => onToggleAudio(audio.url)}
+                      style={({ pressed }) => [styles.audioControlButton, pressed && styles.pressed]}
+                    >
+                      <MaterialIcons
+                        color="#5546BA"
+                        name={isPlaying ? "pause" : "play-arrow"}
+                        size={18}
+                      />
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel="Stop pronunciation audio"
+                      disabled={audioPlayback.status === "loading"}
+                      onPress={onStopAudio}
+                      style={({ pressed }) => [styles.audioControlButton, pressed && styles.pressed]}
+                    >
+                      <MaterialIcons color="#5546BA" name="stop" size={18} />
+                    </Pressable>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
-          </View>
-        ) : null}
-      </View>
+            );
+          })}
+        </View>
+      ) : null}
 
       {(entry.meanings || []).map((meaning, meaningIndex) => (
         <View key={`${meaning.partOfSpeech}-${meaningIndex}`} style={styles.meaningBlock}>
@@ -206,7 +269,7 @@ function ResultView({ audioPlayback, data, onPauseAudio, onStopAudio, onToggleAu
   );
 }
 
-function HistoryDrawer({ history, visible, onClose, onSelectHistory }) {
+function HistoryDrawer({ history, visible, onClose, onSelectHistory, styles, theme }) {
   const slide = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
 
   useEffect(() => {
@@ -230,7 +293,7 @@ function HistoryDrawer({ history, visible, onClose, onSelectHistory }) {
               </Text>
             </View>
             <Pressable accessibilityLabel="Close history drawer" onPress={onClose} style={styles.iconButton}>
-              <MaterialIcons color="#182825" name="close" size={22} />
+              <MaterialIcons color={theme === "dark" ? "#F8FAF6" : "#182825"} name="close" size={22} />
             </Pressable>
           </View>
 
@@ -268,6 +331,8 @@ export default function App() {
   const [lastSubmittedWord, setLastSubmittedWord] = useState("");
   const [wordData, setWordData] = useState(null);
   const [history, setHistory] = useState([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [themeMode, setThemeMode] = useState("light");
   const [validationError, setValidationError] = useState("");
   const [feedback, setFeedback] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -276,6 +341,8 @@ export default function App() {
   const soundRef = useRef(null);
 
   const hasData = Array.isArray(wordData) && wordData.length > 0;
+  const isDarkMode = themeMode === "dark";
+  const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
 
   const statusMessage = useMemo(() => {
     if (isLoading) {
@@ -291,6 +358,33 @@ export default function App() {
   }, [feedback, hasData, isLoading, lastSubmittedWord]);
 
   useEffect(() => {
+    const loadStoredPreferences = async () => {
+      try {
+        const [storedHistory, storedTheme] = await Promise.all([
+          AsyncStorage.getItem(HISTORY_STORAGE_KEY),
+          AsyncStorage.getItem(THEME_STORAGE_KEY)
+        ]);
+
+        if (storedHistory) {
+          const parsedHistory = JSON.parse(storedHistory);
+
+          if (Array.isArray(parsedHistory)) {
+            setHistory(parsedHistory.filter((item) => typeof item === "string"));
+          }
+        }
+
+        if (storedTheme === "dark" || storedTheme === "light") {
+          setThemeMode(storedTheme);
+        }
+      } catch (error) {
+        setFeedback("Saved preferences could not be loaded.");
+      } finally {
+        setHistoryLoaded(true);
+      }
+    };
+
+    loadStoredPreferences();
+
     Audio.setAudioModeAsync({
       allowsRecordingIOS: false,
       interruptionModeAndroid: 1,
@@ -308,6 +402,26 @@ export default function App() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!historyLoaded) {
+      return;
+    }
+
+    AsyncStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history)).catch(() => {
+      setFeedback("Search history could not be saved.");
+    });
+  }, [history, historyLoaded]);
+
+  useEffect(() => {
+    if (!historyLoaded) {
+      return;
+    }
+
+    AsyncStorage.setItem(THEME_STORAGE_KEY, themeMode).catch(() => {
+      setFeedback("Theme preference could not be saved.");
+    });
+  }, [historyLoaded, themeMode]);
 
   const addToHistory = (word) => {
     const normalizedWord = normalizeHistoryItem(word);
@@ -335,14 +449,11 @@ export default function App() {
     setFeedback("");
     await unloadAudio();
 
-    if (!cleanedWord) {
-      setValidationError("Please enter a word before searching.");
-      setWordData(null);
-      return;
-    }
+    const inputError = validateSearchTerm(cleanedWord);
 
-    if (cleanedWord.length > 60) {
-      setValidationError("Please search for a shorter word or phrase.");
+    if (inputError) {
+      setValidationError(inputError);
+      setWordData(null);
       return;
     }
 
@@ -451,13 +562,19 @@ export default function App() {
     searchWord(word);
   };
 
+  const toggleTheme = () => {
+    setThemeMode((currentTheme) => (currentTheme === "dark" ? "light" : "dark"));
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style={isDarkMode ? "light" : "dark"} />
       <HistoryDrawer
         history={history}
         onClose={() => setDrawerOpen(false)}
         onSelectHistory={selectHistoryItem}
+        styles={styles}
+        theme={themeMode}
         visible={drawerOpen}
       />
 
@@ -477,6 +594,17 @@ export default function App() {
             </View>
             <Text style={styles.brandSub}>LexiTech Mobile App</Text>
           </View>
+          <Pressable
+            accessibilityLabel={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
+            onPress={toggleTheme}
+            style={({ pressed }) => [styles.themeButton, pressed && styles.pressed]}
+          >
+            <MaterialIcons
+              color={isDarkMode ? "#F8E9A5" : "#101421"}
+              name={isDarkMode ? "light-mode" : "dark-mode"}
+              size={22}
+            />
+          </Pressable>
         </View>
 
         <ScrollView
@@ -530,7 +658,7 @@ export default function App() {
             </Pressable>
           </View>
 
-          {!hasData && !feedback && !isLoading ? <HighlightStory /> : null}
+          {!hasData && !feedback && !isLoading ? <HighlightStory styles={styles} /> : null}
 
           {validationError ? <Text style={styles.validationText}>{validationError}</Text> : null}
 
@@ -557,6 +685,7 @@ export default function App() {
               onPauseAudio={pauseAudio}
               onStopAudio={stopAudio}
               onToggleAudio={toggleAudio}
+              styles={styles}
             />
           ) : null}
         </ScrollView>
@@ -565,13 +694,31 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(isDark) {
+  const colors = {
+    appBg: isDark ? "#101421" : "#EEF6EF",
+    heroBg: isDark ? "#22283A" : "#F6E9B9",
+    surface: isDark ? "#1A2030" : "#FFFFFF",
+    elevated: isDark ? "#22293A" : "#FAFAF7",
+    text: isDark ? "#F8FAF6" : "#101421",
+    title: isDark ? "#F8E9A5" : "#073E37",
+    muted: isDark ? "#B7C0BB" : "#59605D",
+    border: isDark ? "rgba(255, 255, 255, 0.12)" : "rgba(16, 20, 33, 0.08)",
+    inputBg: isDark ? "#101421" : "#FFFFFF",
+    primary: isDark ? "#7B5CE6" : "#5546BA",
+    primarySoft: isDark ? "#302A55" : "#ECE6FF",
+    orange: "#FF7A30",
+    danger: isDark ? "#FF8D83" : "#D95047",
+    backdrop: isDark ? "rgba(0, 0, 0, 0.68)" : "rgba(16, 20, 33, 0.45)"
+  };
+
+  return StyleSheet.create({
   safeArea: {
-    backgroundColor: "#EEF6EF",
+    backgroundColor: colors.appBg,
     flex: 1
   },
   appShell: {
-    backgroundColor: "#EEF6EF",
+    backgroundColor: colors.appBg,
     flex: 1
   },
   topBar: {
@@ -584,10 +731,21 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     zIndex: 2
   },
+  themeButton: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: "center",
+    marginLeft: "auto",
+    width: 44
+  },
   iconButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.78)",
-    borderColor: "rgba(16, 20, 33, 0.08)",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     height: 44,
@@ -600,12 +758,12 @@ const styles = StyleSheet.create({
     gap: 7
   },
   brand: {
-    color: "#101421",
+    color: colors.text,
     fontSize: 17,
     fontWeight: "900"
   },
   brandSub: {
-    color: "#7B7F88",
+    color: colors.muted,
     fontSize: 12,
     marginTop: 1
   },
@@ -616,7 +774,7 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: "center",
-    backgroundColor: "#F6E9B9",
+    backgroundColor: colors.heroBg,
     borderBottomLeftRadius: 34,
     borderBottomRightRadius: 34,
     marginHorizontal: -20,
@@ -631,7 +789,7 @@ const styles = StyleSheet.create({
     shadowRadius: 30
   },
   heroTitle: {
-    color: "#073E37",
+    color: colors.title,
     fontSize: 34,
     fontWeight: "900",
     lineHeight: 38,
@@ -639,7 +797,7 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   heroText: {
-    color: "#46504D",
+    color: colors.muted,
     fontSize: 14,
     lineHeight: 20,
     marginTop: 12,
@@ -654,8 +812,8 @@ const styles = StyleSheet.create({
   },
   inputWrap: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "#101421",
+    backgroundColor: colors.inputBg,
+    borderColor: isDark ? "#6A5ACD" : "#101421",
     borderRadius: 22,
     borderWidth: 1,
     flex: 1,
@@ -669,18 +827,18 @@ const styles = StyleSheet.create({
     shadowRadius: 18
   },
   inputWrapError: {
-    backgroundColor: "#FFF7F6",
-    borderColor: "#FF615E"
+    backgroundColor: isDark ? "#381F25" : "#FFF7F6",
+    borderColor: colors.danger
   },
   input: {
-    color: "#101421",
+    color: colors.text,
     flex: 1,
     fontSize: 16,
     minHeight: 44
   },
   searchButton: {
     alignItems: "center",
-    backgroundColor: "#101421",
+    backgroundColor: isDark ? "#7B5CE6" : "#101421",
     borderRadius: 23,
     flexDirection: "row",
     gap: 0,
@@ -692,7 +850,7 @@ const styles = StyleSheet.create({
     opacity: 0.72
   },
   validationText: {
-    color: "#D95047",
+    color: colors.danger,
     fontSize: 14,
     fontWeight: "700",
     marginTop: 10
@@ -701,13 +859,13 @@ const styles = StyleSheet.create({
     marginTop: 32
   },
   storyTitle: {
-    color: "#101421",
+    color: colors.text,
     fontSize: 18,
     fontWeight: "900",
     marginBottom: 8
   },
   storyCopy: {
-    color: "#59605D",
+    color: colors.muted,
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 12
@@ -729,8 +887,8 @@ const styles = StyleSheet.create({
   },
   feedbackBox: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "rgba(16, 20, 33, 0.08)",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -743,32 +901,32 @@ const styles = StyleSheet.create({
     shadowRadius: 22
   },
   errorBox: {
-    backgroundColor: "#FFF3F0",
-    borderColor: "#FFD1C7"
+    backgroundColor: isDark ? "#3A2024" : "#FFF3F0",
+    borderColor: isDark ? "#7E3432" : "#FFD1C7"
   },
   feedbackText: {
-    color: "#073E37",
+    color: colors.title,
     flex: 1,
     fontSize: 14,
     fontWeight: "700",
     lineHeight: 20
   },
   errorText: {
-    color: "#BA3B32"
+    color: colors.danger
   },
   retryButton: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8
   },
   retryText: {
-    color: "#D95047",
+    color: colors.danger,
     fontSize: 13,
     fontWeight: "900"
   },
   resultWrap: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     gap: 16,
@@ -781,7 +939,7 @@ const styles = StyleSheet.create({
     shadowRadius: 30
   },
   wordHeader: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderBottomColor: "#FF9A3C",
     borderBottomWidth: 2,
     borderRadius: 0,
@@ -803,14 +961,14 @@ const styles = StyleSheet.create({
     textTransform: "uppercase"
   },
   wordTitle: {
-    color: "#383A3F",
+    color: colors.text,
     fontSize: 38,
     fontWeight: "900",
     lineHeight: 42,
     marginTop: 7
   },
   phonetic: {
-    color: "#A3A8A6",
+    color: colors.muted,
     fontSize: 15,
     fontWeight: "700",
     marginTop: 8
@@ -828,28 +986,86 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     width: "100%"
   },
+  pronunciationSection: {
+    gap: 10
+  },
+  pronunciationTitleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 2
+  },
+  pronunciationTitle: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: "900"
+  },
+  pronunciationCard: {
+    alignItems: "center",
+    backgroundColor: colors.elevated,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    minHeight: 66,
+    padding: 10
+  },
+  pronunciationCardActive: {
+    borderColor: colors.primary,
+    borderWidth: 1.5
+  },
+  pronunciationIcon: {
+    alignItems: "center",
+    backgroundColor: colors.primarySoft,
+    borderRadius: 8,
+    height: 44,
+    justifyContent: "center",
+    width: 44
+  },
+  pronunciationIconActive: {
+    backgroundColor: colors.primary
+  },
+  pronunciationTextWrap: {
+    flex: 1
+  },
+  pronunciationLabel: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "900"
+  },
+  pronunciationPhonetic: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "800",
+    marginTop: 4
+  },
+  pronunciationControls: {
+    flexDirection: "row",
+    gap: 6
+  },
   audioButton: {
     alignItems: "center",
-    backgroundColor: "#EAF5FF",
+    backgroundColor: colors.primarySoft,
     borderRadius: 20,
     height: 40,
     justifyContent: "center",
     width: 40
   },
   audioButtonActive: {
-    backgroundColor: "#078576"
+    backgroundColor: colors.primary
   },
   audioControlButton: {
     alignItems: "center",
-    backgroundColor: "#F7F2DF",
+    backgroundColor: colors.primarySoft,
     borderRadius: 17,
     height: 34,
     justifyContent: "center",
     width: 34
   },
   meaningBlock: {
-    backgroundColor: "#FAFAF7",
-    borderColor: "#EFEDE7",
+    backgroundColor: colors.elevated,
+    borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     padding: 16
@@ -891,16 +1107,16 @@ const styles = StyleSheet.create({
     flex: 1
   },
   definitionText: {
-    color: "#202226",
+    color: colors.text,
     fontSize: 15,
     lineHeight: 23
   },
   exampleText: {
-    backgroundColor: "#F6F5F0",
+    backgroundColor: isDark ? "#161B28" : "#F6F5F0",
     borderLeftColor: "#FF9A3C",
     borderLeftWidth: 3,
     borderRadius: 8,
-    color: "#626761",
+    color: colors.muted,
     fontSize: 14,
     fontStyle: "italic",
     lineHeight: 21,
@@ -914,10 +1130,10 @@ const styles = StyleSheet.create({
   },
   drawerBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(16, 20, 33, 0.45)"
+    backgroundColor: colors.backdrop
   },
   drawer: {
-    backgroundColor: "#F7F7F4",
+    backgroundColor: colors.appBg,
     borderBottomRightRadius: 28,
     borderTopRightRadius: 28,
     height: "100%",
@@ -936,12 +1152,12 @@ const styles = StyleSheet.create({
     marginBottom: 16
   },
   drawerTitle: {
-    color: "#101421",
+    color: colors.text,
     fontSize: 24,
     fontWeight: "900"
   },
   drawerSubtitle: {
-    color: "#7B7F88",
+    color: colors.muted,
     fontSize: 13,
     marginTop: 4
   },
@@ -951,8 +1167,8 @@ const styles = StyleSheet.create({
   },
   historyItem: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "rgba(16, 20, 33, 0.06)",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: "row",
@@ -961,10 +1177,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12
   },
   historyItemPressed: {
-    backgroundColor: "#FFF3D5"
+    backgroundColor: isDark ? "#302A55" : "#FFF3D5"
   },
   historyWord: {
-    color: "#101421",
+    color: colors.text,
     flex: 1,
     fontSize: 16,
     fontWeight: "800",
@@ -972,14 +1188,14 @@ const styles = StyleSheet.create({
   },
   drawerEmpty: {
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderColor: "rgba(16, 20, 33, 0.06)",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: 8,
     borderWidth: 1,
     padding: 22
   },
   drawerEmptyText: {
-    color: "#59605D",
+    color: colors.muted,
     fontSize: 15,
     lineHeight: 21,
     marginTop: 10,
@@ -988,4 +1204,5 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.82
   }
-});
+  });
+}

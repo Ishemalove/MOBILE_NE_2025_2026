@@ -50,6 +50,32 @@
       position: relative;
     }
 
+    .phone.dark {
+      background: #101421;
+      color: #f8faf6;
+    }
+
+    .phone.dark .hero {
+      background: #22283a;
+    }
+
+    .phone.dark h1 {
+      color: #f8e9a5;
+    }
+
+    .phone.dark .subcopy,
+    .phone.dark .story p,
+    .phone.dark .phonetic {
+      color: #b7c0bb;
+    }
+
+    .phone.dark .sheet,
+    .phone.dark .drawer,
+    .phone.dark .input {
+      background: #1a2030;
+      color: #f8faf6;
+    }
+
     .hero {
       background: var(--cream);
       border-bottom-left-radius: 34px;
@@ -96,6 +122,19 @@
       font-size: 14px;
       font-weight: 900;
       gap: 7px;
+    }
+
+    .theme-pill {
+      align-items: center;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(16, 20, 33, 0.08);
+      border-radius: 8px;
+      display: grid;
+      font-size: 12px;
+      font-weight: 900;
+      height: 38px;
+      justify-content: center;
+      width: 38px;
     }
 
     .book {
@@ -241,6 +280,86 @@
       margin-top: 8px;
     }
 
+    .pron-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .pron-title {
+      align-items: center;
+      color: #101421;
+      display: flex;
+      font-size: 17px;
+      font-weight: 950;
+      gap: 8px;
+    }
+
+    .phone.dark .pron-title {
+      color: #f8faf6;
+    }
+
+    .pron-card {
+      align-items: center;
+      background: #fafaf7;
+      border: 1px solid #efede7;
+      border-radius: 8px;
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 44px 1fr 78px;
+      min-height: 66px;
+      padding: 10px;
+    }
+
+    .phone.dark .pron-card {
+      background: #22293a;
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    .pron-card.active {
+      border: 2px solid #7b5ce6;
+    }
+
+    .pron-icon {
+      align-items: center;
+      background: #ece6ff;
+      border-radius: 8px;
+      color: #5546ba;
+      display: grid;
+      font-size: 12px;
+      font-weight: 900;
+      height: 44px;
+      justify-content: center;
+      width: 44px;
+    }
+
+    .pron-card.active .pron-icon {
+      background: #7b5ce6;
+      color: white;
+    }
+
+    .pron-name {
+      font-size: 15px;
+      font-weight: 950;
+    }
+
+    .pron-sound {
+      color: #7b7f88;
+      font-size: 13px;
+      font-weight: 800;
+      margin-top: 4px;
+    }
+
+    .phone.dark .pron-sound {
+      color: #b7c0bb;
+    }
+
+    .pron-controls {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
     .mini {
       align-items: center;
       background: #f7f2df;
@@ -383,7 +502,7 @@
         <div class="topbar">
           <div class="icon">menu</div>
           <div class="brand"><span class="book">book</span> Open Dictionary</div>
-          <div></div>
+          <div class="theme-pill">sun</div>
         </div>
         <h1>Find all the definitions to your words in one go</h1>
         <p class="subcopy">Type or paste any English word and get definitions, examples, and pronunciation.</p>
@@ -415,7 +534,7 @@
         <div class="topbar">
           <div class="icon">menu</div>
           <div class="brand"><span class="book">book</span> Open Dictionary</div>
-          <div></div>
+          <div class="theme-pill">sun</div>
         </div>
         <h1>Find all the definitions to your words in one go</h1>
         <p class="subcopy">Search meanings, parts of speech, examples, and pronunciation.</p>
@@ -431,12 +550,35 @@
             <div class="word">Lexicon</div>
             <div class="phonetic">/lek-si-kuhn/</div>
           </div>
-          <div>
-            <div class="audio">audio</div>
-            <div class="audio-row">
+        </div>
+        <div class="pron-list">
+          <div class="pron-title">mic Pronunciations</div>
+          <div class="pron-card active">
+            <div class="pron-icon">audio</div>
+            <div>
+              <div class="pron-name">UK Pronunciation</div>
+              <div class="pron-sound">/lek-si-kuhn/</div>
+            </div>
+            <div class="pron-controls">
               <div class="mini">pause</div>
               <div class="mini">stop</div>
             </div>
+          </div>
+          <div class="pron-card">
+            <div class="pron-icon">audio</div>
+            <div>
+              <div class="pron-name">US Pronunciation</div>
+              <div class="pron-sound">/lek-si-kuhn/</div>
+            </div>
+            <div></div>
+          </div>
+          <div class="pron-card">
+            <div class="pron-icon">audio</div>
+            <div>
+              <div class="pron-name">Australian Pronunciation</div>
+              <div class="pron-sound">/lek-si-kuhn/</div>
+            </div>
+            <div></div>
           </div>
         </div>
         <div class="meaning">
@@ -456,7 +598,7 @@
       </section>
     </article>
 
-    <article class="phone drawer-phone">
+    <article class="phone dark drawer-phone">
       <section class="drawer">
         <div class="drawer-head">
           <div>
