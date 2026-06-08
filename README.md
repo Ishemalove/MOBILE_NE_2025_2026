@@ -123,16 +123,3 @@ If the API does not respond, test this URL in a browser:
 https://api.dictionaryapi.dev/api/v2/entries/en/example
 ```
 
-## Design Handoff
-
-Open the design mockup:
-
-```text
-design/figma-dictionary-design.html
-```
-
-## Separate Documentation
-
-- Data flow diagram: `docs/DATA_FLOW_DIAGRAM.md`
-- System architecture: `docs/SYSTEM_ARCHITECTURE.md`
-- Activity verification checklist: `docs/ACTIVITY_VERIFICATION.md`
